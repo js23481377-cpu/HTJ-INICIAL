@@ -33,8 +33,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// TRAMPA DE DEPURADOR: Si logran abrir la consola desde el menú del navegador,
-// este bucle infinito congelará la pestaña impidiendo que inspeccionen los elementos.
+// TRAMPA DE DEPURADOR: Congela la pestaña si abren la consola
 setInterval(() => {
   debugger;
 }, 100);
@@ -84,14 +83,15 @@ setInterval(() => {
 
     if (typeof supabase !== 'undefined' && userData) {
       try {
-        const SUPABASE_URL = 'https://mhvvpuvkyjrjvmhowwme.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_LCK17AcmINHv8d_X14yuxg_LyeQj172';
+        // CREDENCIALES ACTUALIZADAS DE SUPABASE
+        const SUPABASE_URL = 'https://okihugbwtxbycvjiskyf.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9raWh1Z2J3dHhieWN2amlza3lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNDMxODQsImV4cCI6MjEwODYxOTE4NH0.tUIXj2-LHngS4pEn36XSk9kVs2GvFDXKhlZDA0tgnR8';
         
         const localDb = (typeof window.db !== 'undefined') ? window.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
         const query = userData.id 
-          ? localDb.from('profiles').select('id, is_approved').eq('id', userData.id).single()
-          : localDb.from('profiles').select('id, is_approved').eq('email', userData.email).single();
+          ? localDb.from('profiles').select('id, is_approved').eq('id', userData.id).maybeSingle()
+          : localDb.from('profiles').select('id, is_approved').eq('email', userData.email).maybeSingle();
 
         const { data: profile, error } = await query;
 
