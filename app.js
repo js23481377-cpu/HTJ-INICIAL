@@ -1,3 +1,24 @@
+// =======================================================
+// 1. CONFIGURACIÓN E INICIALIZACIÓN DE SUPABASE Y EMAILJS
+// =======================================================
+const SUPABASE_URL = 'https://okihugbwtxbycvjiskyf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9raWh1Z2J3dHhieWN2amlza3lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNDMxODQsImV4cCI6MjEwODYxOTE4NH0.tUIXj2-LHngS4pEn36XSk9kVs2GvFDXKhlZDA0tgnR8';
+
+// Inicializar cliente de Supabase
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Configuración de EmailJS
+const EMAILJS_PUBLIC_KEY = '4YWvGd62dXMQwTMuj';
+const EMAILJS_SERVICE_ID = 'service_dtim3ij';
+const EMAILJS_TEMPLATE_ID = 'template_6d7x41c';
+
+if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'TU_EMAILJS_PUBLIC_KEY') {
+  emailjs.init(EMAILJS_PUBLIC_KEY);
+}
+
+// =======================================================
+// 2. LÓGICA PRINCIPAL DE LA APLICACIÓN
+// =======================================================
 document.addEventListener('DOMContentLoaded', async () => {
   lucide.createIcons();
 
@@ -37,6 +58,59 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let customStrategies = JSON.parse(localStorage.getItem(STRATEGIES_KEY)) || [];
 
+  // --- SOLICITAR CÓDIGO DE ACCESO (REGISTRO + EMAILJS) ---
+  const requestCodeForm = document.getElementById('requestCodeForm') || document.querySelector('form');
+  if (requestCodeForm) {
+    requestCodeForm.addEventListener('submit', async (e) => {
+      // Solo interviene si el formulario actual tiene el campo de solicitar código
+      const emailInput = requestCodeForm.querySelector('input[type="email"]');
+      const usernameInput = requestCodeForm.querySelector('input[placeholder*="Apodo"]') || requestCodeForm.querySelector('input[type="text"]');
+      const passwordInput = requestCodeForm.querySelector('input[type="password"]');
+
+      if (!emailInput || !passwordInput) return; // Es otro formulario, continuar normalmente
+
+      e.preventDefault();
+      const email = emailInput.value.trim();
+      const username = usernameInput ? usernameInput.value.trim() : 'Trader';
+      const password = passwordInput.value;
+
+      try {
+        // Generar código aleatorio de 6 dígitos
+        const accessCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // 1. Registrar usuario en Supabase Auth enviando meta_data para el Trigger
+        const { data, error } = await db.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: {
+              full_name: username,
+              access_code: accessCode
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        // 2. Enviar correo electrónico mediante EmailJS
+        if (typeof emailjs !== 'undefined') {
+          const templateParams = {
+            to_email: email,
+            user_name: username,
+            access_code: accessCode
+          };
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+        }
+
+        alert('¡Código de acceso generado! Revisa tu correo electrónico.');
+
+      } catch (err) {
+        console.error('Error al solicitar código:', err);
+        alert('Error: ' + err.message);
+      }
+    });
+  }
+
   // --- FUNCIONES DE SINCRONIZACIÓN CON SUPABASE ---
   async function fetchTradesFromCloud() {
     if (!currentUser || !currentUser.id || typeof db === 'undefined') return;
@@ -54,7 +128,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (data && data.length > 0) {
-        // Mapear los campos de la base de datos a la estructura del frontend
         trades = data.map(t => ({
           id: t.id,
           date: t.created_at ? t.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
@@ -82,7 +155,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           user_id: currentUser.id,
           asset: tradeData.asset,
           type: tradeData.direction,
-          entry_price: 0, // Campo por defecto para esquema SQL
+          entry_price: 0,
           pnl: tradeData.pnl,
           result: tradeData.resultType.toUpperCase(),
           notes: `Estrategia: ${tradeData.strategy || 'Sin estrategia'} | ${tradeData.notes || ''}`
@@ -244,7 +317,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (prevMonthBtn) prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); updateDashboard(); });
   if (nextMonthBtn) nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); updateDashboard(); });
 
-  // --- BOTONES ESTÁTICOS NORMALES (TIPO, ACTIVO, DIRECCIÓN) ---
+  // --- BOTONES ESTÁTICOS NORMALES ---
   const typeButtons = document.querySelectorAll('#typeGroup .pill-btn');
   const tradeResultTypeInput = document.getElementById('tradeResultType');
   typeButtons.forEach(btn => {
@@ -501,7 +574,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         trades = trades.map(t => t.id == editId ? tradeObject : t);
       } else {
         trades.push(tradeObject);
-        // Sincronizar nuevo trade con Supabase
         await syncTradeToCloud(tradeObject);
       }
 
@@ -543,13 +615,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       capitalBadgeEl.innerHTML = `${badgeSign}$${totalPnl.toFixed(2)} <span>resultado del mes</span>`;
     }
 
-    document.getElementById('kpiWinRate').textContent = `${winRate}%`;
-    document.getElementById('kpiProfitFactor').textContent = profitFactor;
-    document.getElementById('kpiAvgWL').textContent = `+$${avgWin} / -$${avgLoss}`;
-    document.getElementById('kpiStreak').textContent = `${uniqueDays.length}W`;
-    document.getElementById('communityOps').textContent = activeTrades.length;
-    document.getElementById('communityWinRate').textContent = `${winRate}%`;
-    document.getElementById('registeredTag').textContent = `${uniqueDays.length} días registrados`;
+    const kpiWinRate = document.getElementById('kpiWinRate');
+    const kpiProfitFactor = document.getElementById('kpiProfitFactor');
+    const kpiAvgWL = document.getElementById('kpiAvgWL');
+    const kpiStreak = document.getElementById('kpiStreak');
+    const communityOps = document.getElementById('communityOps');
+    const communityWinRate = document.getElementById('communityWinRate');
+    const registeredTag = document.getElementById('registeredTag');
+
+    if (kpiWinRate) kpiWinRate.textContent = `${winRate}%`;
+    if (kpiProfitFactor) kpiProfitFactor.textContent = profitFactor;
+    if (kpiAvgWL) kpiAvgWL.textContent = `+$${avgWin} / -$${avgLoss}`;
+    if (kpiStreak) kpiStreak.textContent = `${uniqueDays.length}W`;
+    if (communityOps) communityOps.textContent = activeTrades.length;
+    if (communityWinRate) communityWinRate.textContent = `${winRate}%`;
+    if (registeredTag) registeredTag.textContent = `${uniqueDays.length} días registrados`;
 
     renderCalendar();
     renderChart();
@@ -679,33 +759,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    dailyChartInstance = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          data: dataPoints,
-          borderColor: '#22c55e',
-          borderWidth: 2.5,
-          backgroundColor: gradient,
-          fill: true,
-          pointBackgroundColor: '#22c55e',
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 2,
-          pointRadius: 4,
-          tension: 0.2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#71717a', font: { size: 10 } } },
-          y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#71717a', font: { size: 10 }, callback: (val) => '$' + val } }
+    if (typeof Chart !== 'undefined') {
+      dailyChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: dataPoints,
+            borderColor: '#22c55e',
+            borderWidth: 2.5,
+            backgroundColor: gradient,
+            fill: true,
+            pointBackgroundColor: '#22c55e',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#71717a', font: { size: 10 } } },
+            y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#71717a', font: { size: 10 }, callback: (val) => '$' + val } }
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   // Cargar operaciones guardadas en la nube al inicio
