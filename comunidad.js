@@ -1,3 +1,8 @@
+// Credenciales baro ti Supabase
+const SUPABASE_URL = 'https://okihugbwtxbycvjiskyf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9raWh1Z2J3dHhieWN2amlza3lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNDMxODQsImV4cCI6MjEwODYxOTE4NH0.tUIXj2-LHngS4pEn36XSk9kVs2GvFDXKhlZDA0tgnR8';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 document.addEventListener('DOMContentLoaded', async () => {
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
@@ -20,14 +25,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- REVISAR SI EL USUARIO YA ESTÁ ACTIVO EN EL RANKING ---
   async function checkUserStatus() {
-    if (!currentUser || !currentUser.id || typeof db === 'undefined') return;
+    if (!currentUser || typeof db === 'undefined') return;
 
     try {
-      const { data: userProfile } = await db
-        .from('profiles')
-        .select('is_approved')
-        .eq('id', currentUser.id)
-        .single();
+      const query = currentUser.id 
+        ? db.from('profiles').select('is_approved').eq('id', currentUser.id).maybeSingle()
+        : db.from('profiles').select('is_approved').eq('email', currentUser.email).maybeSingle();
+
+      const { data: userProfile } = await query;
 
       if (userProfile && userProfile.is_approved) {
         setButtonActiveState();
@@ -42,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       btnJoinRanking.style.background = 'rgba(34, 197, 94, 0.15)';
       btnJoinRanking.style.color = '#22c55e';
       btnJoinRanking.style.border = '1px solid #22c55e';
-      btnJoinText.textContent = '✓ Ya estás en el Ranking';
+      if (btnJoinText) btnJoinText.textContent = '✓ Ya estás en el Ranking';
     }
   }
 
@@ -55,23 +60,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       btnJoinRanking.disabled = true;
-      btnJoinText.textContent = 'Activando...';
+      if (btnJoinText) btnJoinText.textContent = 'Activando...';
 
       try {
-        // Upsert o Update en Supabase
-        const { error } = await db
-          .from('profiles')
-          .upsert([
-            {
-              id: currentUser.id,
-              email: currentUser.email,
-              username: currentUser.username || 'Trader',
-              is_approved: true
-            }
-          ], { onConflict: 'id' });
-
-        if (error) {
-          // Intentar actualizar por email si falla por ID
+        if (currentUser.id) {
+          await db
+            .from('profiles')
+            .update({ is_approved: true })
+            .eq('id', currentUser.id);
+        } else {
           await db
             .from('profiles')
             .update({ is_approved: true })
@@ -85,7 +82,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           rankingStatusMsg.textContent = '¡Tu perfil ha sido activado! Ya apareces en la tabla de clasificación.';
         }
 
-        // Recargar la lista en vivo
         await loadLeaderboard();
 
       } catch (err) {
@@ -130,11 +126,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      // Base estandarizada para calcular el % de rentabilidad ($1,000 USD base)
       const DEFAULT_BASE_CAPITAL = 1000;
 
       const leaderboard = profiles.map(user => {
-        const userTrades = trades.filter(t => t.user_id === user.id && t.result !== 'NOOP');
+        const userTrades = (trades || []).filter(t => (t.user_id === user.id || t.email === user.email) && t.result !== 'NOOP');
         const totalOps = userTrades.length;
         
         const winningTrades = userTrades.filter(t => t.result === 'TP' || t.pnl > 0);
@@ -143,7 +138,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const winRate = totalOps > 0 ? Math.round((winningTrades.length / totalOps) * 100) : 0;
         const totalPnl = userTrades.reduce((acc, t) => acc + (parseFloat(t.pnl) || 0), 0);
         
-        // % de Rendimiento = (PnL Total / Capital Base) * 100
+        // % Rendimiento = (PnL Total / Base Capital) * 100
         const profitPercent = (totalPnl / DEFAULT_BASE_CAPITAL) * 100;
 
         const grossProfit = winningTrades.reduce((acc, t) => acc + (parseFloat(t.pnl) || 0), 0);
@@ -152,7 +147,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         return {
           id: user.id,
-          username: user.username || 'Trader',
+          email: user.email,
+          username: user.username || user.email?.split('@')[0] || 'Trader',
           totalOps,
           winRate,
           totalPnl,
@@ -161,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
       });
 
-      // ORDENAR ESTRICTAMENTE DE MAYOR A MENOR SEGÚN EL % DE RENDIMIENTO
+      // ORDENAR DE MAYOR A MENOR SEGÚN % RENDIMIENTO
       leaderboard.sort((a, b) => b.profitPercent - a.profitPercent);
 
       // Renderizar tabla
@@ -171,8 +167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         tr.style.borderBottom = '1px solid var(--card-border)';
         tr.style.height = '48px';
 
-        // Destacar al usuario conectado
-        if (currentUser && currentUser.id === trader.id) {
+        if (currentUser && (currentUser.id === trader.id || currentUser.email === trader.email)) {
           tr.style.background = 'rgba(34, 197, 94, 0.05)';
         }
 
