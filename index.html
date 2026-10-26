@@ -8,13 +8,8 @@
     <title>LIFE TRADING - Pro Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     
-    <!-- Supabase CDN e Inicialización de la conexión -->
+    <!-- Supabase CDN (Librería principal) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-      const SUPABASE_URL = 'https://mhvvpuvkyjrjvmhowwme.supabase.co';
-      const SUPABASE_KEY = 'sb_publishable_LCK17AcmINHv8d_X14yuxg_LyeQj172';
-      const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    </script>
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -69,7 +64,7 @@
                 </div>
 
                 <div class="user-profile">
-                    <!-- AVATAR DINÁMICO (Primera letra del apodo) -->
+                    <!-- AVATAR DINÁMICO -->
                     <div class="avatar" id="sidebarAvatar">J</div>
                     <div class="user-info">
                         <!-- APODO DINÁMICO SIDEBAR -->
@@ -252,7 +247,7 @@
 
             </div>
 
-            <!-- ANÁLISIS PROFUNDO POR ESTRATEGIA (MAQUETADO DENTRO DE MAIN-CONTENT) -->
+            <!-- ANÁLISIS PROFUNDO POR ESTRATEGIA -->
             <div class="card" style="margin-top: 24px;">
                 <div class="card-header-row">
                     <div>
@@ -262,7 +257,6 @@
                     <i data-lucide="layers" style="color: var(--accent-green);"></i>
                 </div>
                 
-                <!-- Grid de columnas para las 5 estrategias -->
                 <div id="strategyColumnsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px;">
                     <!-- Se genera dinámicamente con JS -->
                 </div>
@@ -371,7 +365,7 @@
                 <div class="form-group">
                     <label>Estrategia</label>
                     <div class="pill-group" id="strategyGroup">
-                        <!-- Se llena dinámicamente con las píldoras y el botón + Nueva -->
+                        <!-- Se llena dinámicamente con JS -->
                     </div>
                     <input type="hidden" id="tradeStrategy" value="">
                 </div>
