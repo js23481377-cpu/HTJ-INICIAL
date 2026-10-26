@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script src="guard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LIFE TRADING - Noticias & Calendario</title>
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Supabase CDN e Inicialización de la conexión -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://mhvvpuvkyjrjvmhowwme.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_LCK17AcmINHv8d_X14yuxg_LyeQj172';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <div class="app-layout">
+    
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand">
+          <div class="brand-icon">
+            <i data-lucide="trending-up"></i>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">LIFE TRADING</span>
+            <span class="brand-tag">THE JOURNAL</span>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <span class="nav-section-title">TU ESPACIO</span>
+          <a href="index.html" class="nav-item">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Vista general</span>
+          </a>
+          <a href="backtesting.html" class="nav-item">
+            <i data-lucide="flask-conical"></i>
+            <span>Backtesting</span>
+          </a>
+          <a href="noticias.html" class="nav-item active">
+            <i data-lucide="globe"></i>
+            <span>Noticias / Macro</span>
+          </a>
+          <a href="comunidad.html" class="nav-item">
+            <i data-lucide="bar-chart-2"></i>
+            <span>Comunidad</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="promo-box">
+          <i data-lucide="sparkles" class="promo-icon"></i>
+          <h4>Calendario Económico.</h4>
+          <p>Anticipa los eventos de alto impacto.</p>
+        </div>
+
+        <div class="user-profile">
+          <!-- AVATAR DINÁMICO (Primera letra del apodo) -->
+          <div class="avatar" id="sidebarAvatar">J</div>
+          <div class="user-info">
+            <!-- APODO DINÁMICO SIDEBAR -->
+            <span class="user-name" id="sidebarUserName">JUANO</span>
+            <span class="user-role">Mi journal</span>
+          </div>
+          <button class="btn-logout" title="Cerrar sesión">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+      
+      <!-- HEADER ENCABEZADO -->
+      <header class="content-header">
+        <div class="header-titles">
+          <span class="breadcrumb">MACRO / CALENDARIO DE NOTICIAS</span>
+          <h1>Impacto del Mercado.</h1>
+          <p class="greeting">Eventos de alta volatilidad para NAS100 y XAUUSD.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button id="refreshNewsBtn" class="btn-register" style="background: rgba(255, 255, 255, 0.05); color: var(--text-main); border: 1px solid var(--card-border); box-shadow: none;" title="Actualizar datos">
+            <i data-lucide="refresh-cw"></i>
+            <span>Actualizar</span>
+          </button>
+          <button id="addNewsBtn" class="btn-register">
+            <i data-lucide="plus"></i>
+            <span>Añadir noticia</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- FILTRO DE MES -->
+      <div class="month-bar">
+        <div class="month-selector">
+          <button id="prevMonthBtn" class="btn-arrow"><i data-lucide="chevron-left"></i></button>
+          <span id="currentMonthLabel">Octubre 2026</span>
+          <button id="nextMonthBtn" class="btn-arrow"><i data-lucide="chevron-right"></i></button>
+        </div>
+        <span class="month-subtext">Eventos fundamentales del mes</span>
+      </div>
+
+      <!-- CALENDARIO EXCLUSIVO DE NOTICIAS -->
+      <div class="card calendar-card" style="min-height: 550px;">
+        <div class="card-header-row">
+          <div>
+            <h3>Calendario Económico</h3>
+            <p class="card-subtext">Carpetas rojas con sesiones de impacto.</p>
+          </div>
+          <span id="newsCountTag" class="registered-tag">0 noticias este mes</span>
+        </div>
+
+        <div class="calendar-days-header">
+          <span>DOM</span><span>LUN</span><span>MAR</span><span>MIÉ</span><span>JUE</span><span>VIE</span><span>SÁB</span>
+        </div>
+
+        <div id="newsCalendarCells" class="calendar-cells news-calendar-grid">
+          <!-- Celdas generadas dinámicamente -->
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- MODAL PARA AGREGAR NOTICIA -->
+  <div id="newsModal" class="modal-overlay">
+    <div class="modal-content card">
+      <div class="card-header-row">
+        <h3>Añadir Noticia Macroeconómica</h3>
+        <button id="closeModalBtn" class="btn-icon-setting"><i data-lucide="x"></i></button>
+      </div>
+      <form id="newsForm" class="modal-form">
+        <div class="form-group">
+          <label>Fecha del Evento</label>
+          <input type="date" id="newsDate" required>
+        </div>
+        <div class="form-group">
+          <label>Hora (Ej. 08:30)</label>
+          <input type="time" id="newsTime" required>
+        </div>
+        <div class="form-group">
+          <label>Título de la Noticia / Evento</label>
+          <input type="text" id="newsTitle" placeholder="Ej. IPC / CPI USD o Nóminas No Agrícolas" required>
+        </div>
+        <div class="modal-footer-buttons" style="margin-top: 10px;">
+          <button type="button" id="cancelModalBtn" class="btn-cancel">Cancelar</button>
+          <button type="submit" class="btn-save-modal">Guardar noticia</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="noticias.js"></script>
+</body>
+</html>

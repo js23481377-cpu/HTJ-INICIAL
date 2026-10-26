@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <script src="guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIFE TRADING - Pro Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Supabase CDN e Inicialización de la conexión -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      const SUPABASE_URL = 'https://mhvvpuvkyjrjvmhowwme.supabase.co';
+      const SUPABASE_KEY = 'sb_publishable_LCK17AcmINHv8d_X14yuxg_LyeQj172';
+      const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    </script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+
+    <div class="app-layout">
+
+        <!-- BARRA LATERAL (SIDEBAR) -->
+        <aside class="sidebar">
+            <div class="sidebar-top">
+                <div class="brand">
+                    <div class="brand-icon">
+                        <i data-lucide="trending-up"></i>
+                    </div>
+                    <div class="brand-text">
+                        <span class="brand-name">LIFE TRADING</span>
+                        <span class="brand-tag">THE JOURNAL</span>
+                    </div>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <span class="nav-section-title">TU ESPACIO</span>
+                    <a href="index.html" class="nav-item active">
+                        <i data-lucide="layout-dashboard"></i>
+                        <span>Vista general</span>
+                    </a>
+                    <a href="backtesting.html" class="nav-item">
+                        <i data-lucide="flask-conical"></i>
+                        <span>Backtesting</span>
+                    </a>
+                    <a href="noticias.html" class="nav-item">
+                        <i data-lucide="globe"></i>
+                        <span>Noticias / Macro</span>
+                    </a>
+                    <a href="comunidad.html" class="nav-item">
+                        <i data-lucide="bar-chart-2"></i>
+                        <span>Comunidad</span>
+                    </a>
+                </nav>
+
+            </div>
+
+            <div class="sidebar-bottom">
+                <div class="promo-box">
+                    <i data-lucide="sparkles" class="promo-icon"></i>
+                    <h4>La consistencia es tu ventaja.</h4>
+                    <p>Registra. Revisa. Evoluciona.</p>
+                </div>
+
+                <div class="user-profile">
+                    <!-- AVATAR DINÁMICO (Primera letra del apodo) -->
+                    <div class="avatar" id="sidebarAvatar">J</div>
+                    <div class="user-info">
+                        <!-- APODO DINÁMICO SIDEBAR -->
+                        <span class="user-name" id="sidebarUserName">JUANO</span>
+                        <span class="user-role">Mi journal</span>
+                    </div>
+                    <button class="btn-logout" title="Cerrar sesión">
+                        <i data-lucide="log-out"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="main-content">
+
+            <!-- HEADER ENCABEZADO -->
+            <header class="content-header">
+                <div class="header-titles">
+                    <span class="breadcrumb">JOURNAL / VISTA GENERAL</span>
+                    <h1>Tu rendimiento, en perspectiva.</h1>
+                    <!-- SALUDO DINÁMICO ENCABEZADO -->
+                    <p class="greeting">Hola, <span id="userGreetingName">JUANO</span>. Tu próxima ventaja empieza en el registro.</p>
+                </div>
+                <button id="openModalBtn" class="btn-register">
+                    <i data-lucide="plus"></i>
+                    <span>Registrar hoy</span>
+                </button>
+            </header>
+
+            <!-- FILTRO DE MES -->
+            <div class="month-bar">
+                <div class="month-selector">
+                    <button id="prevMonthBtn" class="btn-arrow"><i data-lucide="chevron-left"></i></button>
+                    <span id="currentMonthLabel">Octubre 2026</span>
+                    <button id="nextMonthBtn" class="btn-arrow"><i data-lucide="chevron-right"></i></button>
+                </div>
+                <span class="month-subtext">Una visión clara de tu rendimiento</span>
+            </div>
+
+            <!-- GRID SECCIÓN SUPERIOR -->
+            <div class="top-grid">
+                <div class="card chart-card">
+                    <div class="card-header-row">
+                        <div>
+                            <h3>Evolución diaria</h3>
+                            <p class="card-subtext">Acumulado de los movimientos registrados</p>
+                        </div>
+                        <div class="legend-indicator">
+                            <span class="dot"></span> Acumulado
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="dailyChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card capital-card">
+                    <div class="card-header-row">
+                        <span class="card-label">CAPITAL ACTUAL</span>
+                        <button id="editBalanceBtn" class="btn-icon-setting" title="Editar saldo inicial"><i
+                                data-lucide="sliders"></i></button>
+                    </div>
+                    <div id="capitalAmount" class="capital-amount">$0.00</div>
+                    <div id="capitalBadge" class="capital-badge">+$0.00 <span>resultado del mes</span></div>
+                    <div class="capital-footer">
+                        <span class="footer-tag">LIFE / CAPITAL OVERVIEW</span>
+                        <span class="footer-desc">Un registro a la vez.</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- METRICAS / KPIS -->
+            <div class="kpis-grid">
+                <div class="card kpi-card">
+                    <div class="kpi-header">
+                        <span>Win rate</span>
+                        <i data-lucide="pie-chart"></i>
+                    </div>
+                    <div id="kpiWinRate" class="kpi-value text-green">0%</div>
+                    <div class="kpi-footer">Operaciones ganadoras</div>
+                </div>
+
+                <div class="card kpi-card">
+                    <div class="kpi-header">
+                        <span>Profit factor</span>
+                        <i data-lucide="scale"></i>
+                    </div>
+                    <div id="kpiProfitFactor" class="kpi-value">0</div>
+                    <div class="kpi-footer">Relación beneficio / pérdida</div>
+                </div>
+
+                <div class="card kpi-card">
+                    <div class="kpi-header">
+                        <span>Promedio W / L</span>
+                        <i data-lucide="arrow-up-right"></i>
+                    </div>
+                    <div id="kpiAvgWL" class="kpi-value">+$0 / -$0</div>
+                    <div class="kpi-footer">Ganancia / pérdida media</div>
+                </div>
+
+                <div class="card kpi-card">
+                    <div class="kpi-header">
+                        <span>Racha</span>
+                        <i data-lucide="zap"></i>
+                    </div>
+                    <div id="kpiStreak" class="kpi-value">0W</div>
+                    <div class="kpi-footer">Días registrados consecutivos</div>
+                </div>
+            </div>
+
+            <!-- GRID SECCIÓN INFERIOR -->
+            <div class="bottom-grid">
+
+                <!-- CALENDARIO -->
+                <div class="card calendar-card">
+                    <div class="card-header-row">
+                        <div>
+                            <h3>Calendario de trading</h3>
+                            <p class="card-subtext">Cada sesión, una pieza de tu historia.</p>
+                        </div>
+                        <span id="registeredTag" class="registered-tag">0 días registrados</span>
+                    </div>
+
+                    <div class="calendar-days-header">
+                        <span>DOM</span><span>LUN</span><span>MAR</span><span>MIÉ</span><span>JUE</span><span>VIE</span><span>SÁB</span>
+                    </div>
+
+                    <div id="calendar-cells" class="calendar-cells"></div>
+
+                    <div class="calendar-legend">
+                        <span class="legend-item"><span class="dot tp"></span> TP</span>
+                        <span class="legend-item"><span class="dot sl"></span> SL</span>
+                        <span class="legend-item"><span class="dot be"></span> BE</span>
+                        <span class="legend-item"><span class="dot retirada"></span> Retirada</span>
+                        <span class="legend-note">Selecciona un día para revisar o registrar operaciones.</span>
+                    </div>
+                </div>
+
+                <!-- PLAN Y COMUNIDAD -->
+                <div class="right-stack">
+                    <div class="card plan-card">
+                        <div class="card-header-row">
+                            <div class="title-with-icon">
+                                <i data-lucide="list-checks"></i>
+                                <h3>Tu plan de trading</h3>
+                            </div>
+                            <button id="editPlanBtn" class="btn-icon-edit" title="Editar plan"><i
+                                    data-lucide="edit-3"></i></button>
+                        </div>
+                        <span class="plan-sub">EL PROCESO ANTES QUE EL RESULTADO</span>
+                        <ol id="planListContainer" class="plan-list">
+                            <!-- Se llena dinámicamente con JS -->
+                        </ol>
+                    </div>
+
+                    <div class="card community-card">
+                        <div class="card-header-row">
+                            <h3>La comunidad</h3>
+                            <i data-lucide="arrow-up-right" class="external-icon"></i>
+                        </div>
+                        <span class="community-sub">Ranking global · Win rate</span>
+
+                        <div class="community-list">
+                            <div class="community-item">
+                                <div class="rank-user">
+                                    <span class="rank-num">01</span>
+                                    <div>
+                                        <!-- APODO DINÁMICO TARJETA COMUNIDAD -->
+                                        <div class="rank-name" id="communityUserName">JUANO</div>
+                                        <div class="rank-ops"><span id="communityOps">0</span> operaciones</div>
+                                    </div>
+                                </div>
+                                <span id="communityWinRate" class="rank-percent text-green">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ANÁLISIS PROFUNDO POR ESTRATEGIA (MAQUETADO DENTRO DE MAIN-CONTENT) -->
+            <div class="card" style="margin-top: 24px;">
+                <div class="card-header-row">
+                    <div>
+                        <h3>Rendimiento por Estrategia</h3>
+                        <p class="card-subtext">Métricas comparativas individuales (Máximo 5 estrategias activas)</p>
+                    </div>
+                    <i data-lucide="layers" style="color: var(--accent-green);"></i>
+                </div>
+                
+                <!-- Grid de columnas para las 5 estrategias -->
+                <div id="strategyColumnsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px;">
+                    <!-- Se genera dinámicamente con JS -->
+                </div>
+            </div>
+
+        </main>
+
+    </div>
+
+    <!-- MODAL DE EDICIÓN DE PLAN DE TRADING -->
+    <div id="planModal" class="modal-overlay">
+        <div class="modal-content card">
+            <div class="card-header-row">
+                <h3>Editar Plan de Trading</h3>
+                <button id="closePlanModalBtn" class="btn-icon-setting"><i data-lucide="x"></i></button>
+            </div>
+            <form id="planForm" class="modal-form">
+                <div class="form-group">
+                    <label>Regla 1</label>
+                    <input type="text" id="planRule1" required>
+                </div>
+                <div class="form-group">
+                    <label>Regla 2</label>
+                    <input type="text" id="planRule2" required>
+                </div>
+                <div class="form-group">
+                    <label>Regla 3</label>
+                    <input type="text" id="planRule3" required>
+                </div>
+                <div class="modal-footer-buttons">
+                    <button type="button" id="cancelPlanModalBtn" class="btn-cancel">Cancelar</button>
+                    <button type="submit" class="btn-save-modal">Guardar plan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE REGISTRO DE OPERACIÓN -->
+    <div id="tradeModal" class="modal-overlay">
+        <div class="modal-content card">
+            <div class="card-header-row">
+                <h3 id="modalTitle">Nuevo Registro</h3>
+                <button id="closeModalBtn" class="btn-icon-setting"><i data-lucide="x"></i></button>
+            </div>
+
+            <!-- VISTA 1: LISTADO DE OPERACIONES DEL DÍA -->
+            <div id="dayTradesView" style="margin-top: 16px;">
+                <div id="tradesListContainer" class="trades-list-container"></div>
+                <button type="button" id="addNewTradeBtn" class="btn-register"
+                    style="width: 100%; justify-content: center; border-radius: 14px;">
+                    <i data-lucide="plus"></i>
+                    <span>Agregar operación</span>
+                </button>
+            </div>
+
+            <!-- VISTA 2: FORMULARIO -->
+            <form id="tradeForm" class="modal-form" style="display: none;">
+                <input type="hidden" id="editingTradeId" value="">
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="tradeDate" required>
+                </div>
+
+                <!-- TIPO DE REGISTRO -->
+                <div class="form-group">
+                    <label>Tipo de Registro</label>
+                    <div class="pill-group" id="typeGroup">
+                        <button type="button" class="pill-btn tp active" data-value="tp">TP</button>
+                        <button type="button" class="pill-btn sl" data-value="sl">SL</button>
+                        <button type="button" class="pill-btn be" data-value="be">BE</button>
+                        <button type="button" class="pill-btn noop" data-value="noop">NO OPERÉ</button>
+                        <button type="button" class="pill-btn retirada" data-value="retirada">RETIRADA</button>
+                    </div>
+                    <input type="hidden" id="tradeResultType" value="tp">
+                </div>
+
+                <!-- ACTIVO -->
+                <div class="form-group">
+                    <label>Activo / Par Operado</label>
+                    <div class="pill-group" id="assetGroup">
+                        <button type="button" class="pill-btn asset-btn active" data-value="NAS100">NAS100</button>
+                        <button type="button" class="pill-btn asset-btn" data-value="XAUUSD">XAUUSD</button>
+                    </div>
+                    <input type="hidden" id="tradeAsset" value="NAS100">
+                </div>
+
+                <!-- DIRECCIÓN -->
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <div class="pill-group direction-group" id="directionGroup">
+                        <button type="button" class="pill-btn dir-btn long active" data-value="LONG"><i
+                                data-lucide="trending-up" style="width:14px;height:14px;"></i> LONG</button>
+                        <button type="button" class="pill-btn dir-btn short" data-value="SHORT"><i
+                                data-lucide="trending-down" style="width:14px;height:14px;"></i> SHORT</button>
+                    </div>
+                    <input type="hidden" id="tradeDirection" value="LONG">
+                </div>
+
+                <!-- PNL ($) -->
+                <div class="form-group">
+                    <label>PnL ($)</label>
+                    <input type="number" step="0.01" id="tradePnl"
+                        placeholder="Ej. 50 (Si es SL se guarda negativo solo)" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Estrategia</label>
+                    <div class="pill-group" id="strategyGroup">
+                        <!-- Se llena dinámicamente con las píldoras y el botón + Nueva -->
+                    </div>
+                    <input type="hidden" id="tradeStrategy" value="">
+                </div>
+
+                <!-- NOTAS -->
+                <div class="form-group">
+                    <label>Notas / Sensaciones</label>
+                    <textarea id="tradeNotes" placeholder="Estrategia, errores o reflexiones..."></textarea>
+                </div>
+
+                <!-- ADJUNTAR FOTO -->
+                <div class="form-group">
+                    <label>Captura del Trade</label>
+                    <label for="tradePhotoInput" class="upload-box">
+                        <i data-lucide="image"></i>
+                        <span id="photoFileName">Adjuntar foto</span>
+                    </label>
+                    <input type="file" id="tradePhotoInput" accept="image/*" style="display: none;">
+                </div>
+
+                <!-- BOTONES FINALES -->
+                <div class="modal-footer-buttons">
+                    <button type="button" id="backToListBtn" class="btn-cancel">Cancelar</button>
+                    <button type="submit" class="btn-save-modal">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- LIGHTBOX PARA FOTO GRANDE -->
+    <div id="lightboxModal" class="lightbox-overlay">
+        <img id="lightboxImg" class="lightbox-content" src="" alt="Captura ampliada">
+    </div>
+
+    <!-- MODAL DE SALDO INICIAL (BLOQUEANTE AL ENTRAR) -->
+    <div id="initialBalanceModal" class="modal-overlay">
+        <div class="modal-content card">
+            <div class="card-header-row">
+                <h3>Configurar Capital Inicial</h3>
+            </div>
+            <form id="initialBalanceForm" class="modal-form">
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>¿Cuál es tu saldo inicial para este journal?</label>
+                    <input type="number" step="0.01" id="initialBalanceInput" placeholder="Ej. 1000.00" required>
+                </div>
+                <button type="submit" class="btn-register"
+                    style="width: 100%; justify-content: center; margin-top: 10px; border-radius: 14px;">
+                    <span>Guardar y ver dashboard</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

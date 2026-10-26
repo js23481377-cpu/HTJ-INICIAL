@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script src="guard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LIFE TRADING - Comunidad</title>
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Supabase CDN e Inicialización de la conexión -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://mhvvpuvkyjrjvmhowwme.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_LCK17AcmINHv8d_X14yuxg_LyeQj172';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <div class="app-layout">
+    
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand">
+          <div class="brand-icon"><i data-lucide="trending-up"></i></div>
+          <div class="brand-text">
+            <span class="brand-name">LIFE TRADING</span>
+            <span class="brand-tag">THE JOURNAL</span>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <span class="nav-section-title">TU ESPACIO</span>
+          <a href="index.html" class="nav-item">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Vista general</span>
+          </a>
+          <a href="backtesting.html" class="nav-item">
+            <i data-lucide="flask-conical"></i>
+            <span>Backtesting</span>
+          </a>
+          <a href="noticias.html" class="nav-item">
+            <i data-lucide="globe"></i>
+            <span>Noticias / Macro</span>
+          </a>
+          <a href="comunidad.html" class="nav-item active">
+            <i data-lucide="bar-chart-2"></i>
+            <span>Comunidad</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="promo-box">
+          <i data-lucide="sparkles" class="promo-icon"></i>
+          <h4>Comunidad de Traders.</h4>
+          <p>Compite y evoluciona en grupo.</p>
+        </div>
+
+        <div class="user-profile">
+          <!-- AVATAR DINÁMICO (Primera letra del apodo) -->
+          <div class="avatar" id="sidebarAvatar">J</div>
+          <div class="user-info">
+            <!-- APODO DINÁMICO SIDEBAR -->
+            <span class="user-name" id="sidebarUserName">JUANO</span>
+            <span class="user-role">Mi journal</span>
+          </div>
+          <button class="btn-logout" title="Cerrar sesión">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+      
+      <!-- HEADER ENCABEZADO -->
+      <header class="content-header">
+        <div class="header-titles">
+          <span class="breadcrumb">COMUNIDAD / RANKING</span>
+          <h1>Leaderboard de Traders</h1>
+          <p class="greeting">Clasificación global ordenada por % de rendimiento del mes.</p>
+        </div>
+        <!-- BOTÓN DE ACTIVACIÓN DIRECTA -->
+        <button id="btnJoinRanking" class="btn-register">
+          <i data-lucide="trophy"></i>
+          <span id="btnJoinText">Participar en Ranking</span>
+        </button>
+      </header>
+
+      <!-- MENSAJE DE ESTADO -->
+      <div id="rankingStatusMsg" style="margin-top: 10px; font-size: 13px; font-weight: 600; display: none;"></div>
+
+      <!-- TABLA DE RANKING -->
+      <div class="card" style="margin-top: 20px;">
+        <div class="card-header-row">
+          <div>
+            <h3>Ranking Global del Mes</h3>
+            <p class="card-subtext">Traders compitiendo en vivo en la comunidad.</p>
+          </div>
+          <i data-lucide="award" style="color: #eab308; width: 24px; height: 24px;"></i>
+        </div>
+
+        <div style="margin-top: 16px; overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted); height: 40px;">
+                <th style="padding: 10px;">Puesto</th>
+                <th style="padding: 10px;">Trader</th>
+                <th style="padding: 10px;">% Rendimiento Mes</th>
+                <th style="padding: 10px;">Win Rate (%)</th>
+                <th style="padding: 10px;">Trades Totales</th>
+                <th style="padding: 10px;">Profit Factor</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+              <!-- Carga dinámicamente desde comunidad.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <script src="comunidad.js"></script>
+</body>
+</html>
