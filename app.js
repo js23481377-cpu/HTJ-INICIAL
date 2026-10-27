@@ -124,6 +124,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (data && data.length > 0) {
+        // Diagnóstico temporal: comparar antes de reemplazar los datos locales.
+        console.log('OPERACIONES LOCALES');
+        console.table(trades.map(t => ({
+          activo: t.asset,
+          resultado: t.resultType,
+          saldo: t.pnl
+        })));
+
+        console.log('OPERACIONES EN LA NUBE');
+        console.table(data.map(t => ({
+          activo: t.asset,
+          resultado: t.result,
+          saldo: t.pnl
+        })));
+
         trades = data.map(t => {
           const exactResult = (t.result || t.type || 'tp').toLowerCase();
           let rawPnl = parseFloat(t.pnl) || 0;
