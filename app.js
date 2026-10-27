@@ -548,13 +548,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     tradeForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      let pnlValue = parseFloat(document.getElementById('tradePnl').value) || 0;
-      const resultType = tradeResultTypeInput.value;
+      const rawPnl = parseFloat(document.getElementById('tradePnl').value) || 0;
+      const resultType = tradeResultTypeInput.value; // 'tp', 'sl', 'be', etc.
       const strategyInput = document.getElementById('tradeStrategy');
       const strategyVal = strategyInput ? strategyInput.value : '';
 
-      if (resultType === 'sl' && pnlValue > 0) pnlValue = -pnlValue;
-      if (resultType === 'noop' || resultType === 'be') pnlValue = 0;
+      // --- INICIO DEL CANDADO MATEMÁTICO ---
+      let pnlValue = rawPnl;
+      if (resultType === 'sl') {
+        pnlValue = -Math.abs(rawPnl); // Fuerza negativo
+      } else if (resultType === 'tp') {
+        pnlValue = Math.abs(rawPnl);  // Fuerza positivo
+      } else if (resultType === 'noop' || resultType === 'be') {
+        pnlValue = 0;
+      }
+      // --- FIN DEL CANDADO MATEMÁTICO ---
 
       const editId = editingTradeIdInput.value;
 
