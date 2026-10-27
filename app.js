@@ -335,11 +335,12 @@ function renderTradesList(tradesForDay) {
   }
 
   container.innerHTML = tradesForDay.map(trade => {
+    // Lectura estricta del resultado guardado
     const resType = (trade.result || trade.type || 'TP').toUpperCase();
     const pnlVal = parseFloat(trade.pnl) || 0;
-    const isPositive = pnlVal > 0 || resType === 'TP';
-    const pnlSign = pnlVal >= 0 ? '+' : '';
-    const pnlClass = isPositive ? 'text-green' : (pnlVal < 0 || resType === 'SL' ? 'text-red' : '');
+    const isPositive = resType === 'TP' || (resType !== 'SL' && pnlVal > 0);
+    const pnlSign = isPositive ? '+' : (resType === 'SL' || pnlVal < 0 ? '-' : '');
+    const pnlClass = isPositive ? 'text-green' : (resType === 'SL' || pnlVal < 0 ? 'text-red' : '');
 
     return `
       <div class="trade-item-card" style="padding: 12px; border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02);">
@@ -444,7 +445,7 @@ function setupFormListeners() {
       const strategy = document.getElementById('tradeStrategy').value || 'Sin estrategia';
       const notes = document.getElementById('tradeNotes').value.trim();
 
-      // CANDADO MATEMÁTICO: Fuerza el signo correcto según el botón presionado
+      // CANDADO DE PNL: Asigna el signo según el tipo de resultado seleccionado
       let rawPnl = parseFloat(document.getElementById('tradePnl').value) || 0;
       let finalPnl = rawPnl;
       if (resultType === 'SL') {
@@ -488,6 +489,49 @@ function setupFormListeners() {
       userInitialBalance = val;
       document.getElementById('initialBalanceModal').style.display = 'none';
       await loadDashboardData();
+    });
+  }
+
+  // Edición del Plan de Trading
+  const editPlanBtn = document.getElementById('editPlanBtn');
+  const planModal = document.getElementById('planModal');
+  const closePlanModalBtn = document.getElementById('closePlanModalBtn');
+  const cancelPlanModalBtn = document.getElementById('cancelPlanModalBtn');
+  const planForm = document.getElementById('planForm');
+
+  if (editPlanBtn && planModal) {
+    editPlanBtn.addEventListener('click', async () => {
+      const { data: profile } = await db.from('profiles').select('trading_plan').eq('id', currentUser.id).maybeSingle();
+      const plan = (profile && profile.trading_plan) ? profile.trading_plan : [
+        "Arriesgar máximo el 1% por operación",
+        "Respetar el Horario Operativo (09:30 AM - 11:30 AM)",
+        "Detener la sesión tras 2 Stop Loss seguidos"
+      ];
+      if (document.getElementById('planRule1')) document.getElementById('planRule1').value = plan[0] || '';
+      if (document.getElementById('planRule2')) document.getElementById('planRule2').value = plan[1] || '';
+      if (document.getElementById('planRule3')) document.getElementById('planRule3').value = plan[2] || '';
+      planModal.style.display = 'flex';
+    });
+  }
+
+  if (closePlanModalBtn && planModal) {
+    closePlanModalBtn.addEventListener('click', () => planModal.style.display = 'none');
+  }
+  if (cancelPlanModalBtn && planModal) {
+    cancelPlanModalBtn.addEventListener('click', () => planModal.style.display = 'none');
+  }
+
+  if (planForm) {
+    planForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const r1 = document.getElementById('planRule1').value.trim();
+      const r2 = document.getElementById('planRule2').value.trim();
+      const r3 = document.getElementById('planRule3').value.trim();
+      const newPlan = [r1, r2, r3].filter(r => r.length > 0);
+
+      await db.from('profiles').update({ trading_plan: newPlan }).eq('id', currentUser.id);
+      if (planModal) planModal.style.display = 'none';
+      await fetchTradingPlan();
     });
   }
 }
