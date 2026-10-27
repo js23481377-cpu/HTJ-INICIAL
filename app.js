@@ -124,21 +124,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (data && data.length > 0) {
-        // Diagnóstico temporal: comparar antes de reemplazar los datos locales.
-        console.log('OPERACIONES LOCALES');
-        console.table(trades.map(t => ({
-          activo: t.asset,
-          resultado: t.resultType,
-          saldo: t.pnl
-        })));
-
-        console.log('OPERACIONES EN LA NUBE');
-        console.table(data.map(t => ({
-          activo: t.asset,
-          resultado: t.result,
-          saldo: t.pnl
-        })));
-
         trades = data.map(t => {
           const exactResult = (t.result || t.type || 'tp').toLowerCase();
           let rawPnl = parseFloat(t.pnl) || 0;
@@ -491,6 +476,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       editingTradeIdInput.value = '';
       tradeForm.reset();
+
+      // Los campos hidden deben coincidir con los botones activos.
+      // reset() no restaura estos valores tras modificarlos con .value.
+      tradeResultTypeInput.value = 'tp';
+      tradeAssetInput.value = 'NAS100';
+      tradeDirectionInput.value = 'LONG';
+
       tradeDateInput.value = selectedDateForModal;
       base64Image = '';
       photoFileName.textContent = 'Adjuntar foto';
