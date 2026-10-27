@@ -4,37 +4,29 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 document.addEventListener('DOMContentLoaded', async () => {
-  if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 
-  // --- OBTENER TRADER AUTENTICADO ---
   const localUserData = localStorage.getItem('life_trading_user');
   const currentUser = localUserData ? JSON.parse(localUserData) : null;
 
   const btnJoinRanking = document.getElementById('btnJoinRanking');
   const btnJoinText = document.getElementById('btnJoinText');
   const rankingStatusMsg = document.getElementById('rankingStatusMsg');
-  const sidebarUserName = document.getElementById('sidebarUserName');
-  const sidebarAvatar = document.getElementById('sidebarAvatar');
 
+  // Actualizar UI Sidebar
   if (currentUser && currentUser.username) {
     const upperName = currentUser.username.toUpperCase();
+    const sidebarUserName = document.getElementById('sidebarUserName');
+    const sidebarAvatar = document.getElementById('sidebarAvatar');
     if (sidebarUserName) sidebarUserName.textContent = upperName;
     if (sidebarAvatar) sidebarAvatar.textContent = upperName.charAt(0);
   }
 
-  // --- REVISAR ESTADO EN EL RANKING ---
+  // Verificar estado
   async function checkUserStatus() {
-    if (!currentUser || typeof db === 'undefined') return;
-    try {
-      const { data: profile } = await db.from('profiles').select('is_approved').eq('id', currentUser.id).maybeSingle();
-      if (profile && profile.is_approved) {
-        setButtonActiveState();
-      }
-    } catch (err) {
-      console.error('Error al verificar estado:', err);
-    }
+    if (!currentUser) return;
+    const { data: profile } = await db.from('profiles').select('is_approved').eq('id', currentUser.id).maybeSingle();
+    if (profile && profile.is_approved) setButtonActiveState();
   }
 
   function setButtonActiveState() {
@@ -46,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // --- BOTÓN PARA PARTICIPAR ---
+  // BOTÓN PARTICIPAR (INSERCIÓN FORZOSA SI NO EXISTE)
   if (btnJoinRanking) {
     btnJoinRanking.addEventListener('click', async () => {
       if (!currentUser) return alert('Debes iniciar sesión primero.');
@@ -54,36 +46,58 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (btnJoinText) btnJoinText.textContent = 'Activando...';
 
       try {
-        await db.from('profiles').update({ is_approved: true }).eq('id', currentUser.id);
+        // 1. Intentar actualizar si el perfil existe
+        const { data: updated } = await db
+          .from('profiles')
+          .update({ is_approved: true })
+          .eq('id', currentUser.id)
+          .select();
+
+        // 2. Si no existe, insertarlo a la fuerza
+        if (!updated || updated.length === 0) {
+          await db.from('profiles').insert([{
+            id: currentUser.id,
+            email: currentUser.email,
+            username: currentUser.username || 'Trader',
+            is_approved: true
+          }]);
+        }
+
         setButtonActiveState();
         if (rankingStatusMsg) {
           rankingStatusMsg.style.display = 'block';
           rankingStatusMsg.style.color = '#22c55e';
-          rankingStatusMsg.textContent = '¡Perfil activado! Ya apareces en la tabla de clasificación.';
+          rankingStatusMsg.textContent = '¡Perfil activado! Ya apareces en la tabla.';
         }
         await loadLeaderboard();
       } catch (err) {
-        console.error(err);
+        console.error("Error al participar:", err);
       } finally {
         btnJoinRanking.disabled = false;
       }
     });
   }
 
-  // --- CARGAR TABLA LEADERBOARD (FILTRADA SOLO MES ACTUAL) ---
+  // CARGAR LEADERBOARD
   async function loadLeaderboard() {
     const tbody = document.getElementById('leaderboardBody');
-    if (!tbody || typeof db === 'undefined') return;
+    if (!tbody) return;
     tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Calculando ranking del mes en vivo...</td></tr>`;
 
     try {
-      // 1. Obtener perfiles que participan y su capital inicial
-      const { data: profiles } = await db
+      // Pedir solo datos seguros para evitar crashes
+      const { data: profiles, error: profErr } = await db
         .from('profiles')
-        .select('id, username, email, initial_balance')
+        .select('id, username, email')
         .eq('is_approved', true);
 
-      // 2. Obtener SOLO trades de este mes (Sincronizado con el Dashboard)
+      if (profErr) {
+        console.error("Error perfiles:", profErr);
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: #ef4444;">Error de conexión. Revisa consola.</td></tr>`;
+        return;
+      }
+
+      // Trades del mes actual
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
@@ -95,12 +109,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         .lte('created_at', endOfMonth);
 
       if (!profiles || profiles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Aún no hay traders participando.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Aún no hay traders participando. ¡Únete al ranking!</td></tr>`;
         return;
       }
 
+      const BASE_CAPITAL = 1000; // Base estándar para todos
+
       const leaderboard = profiles.map(user => {
-        // Filtrar y limpiar data
         const userTrades = (trades || []).filter(t => {
           const matchUser = (t.user_id === user.id || t.email === user.email);
           const res = (t.result || t.type || '').toUpperCase();
@@ -124,10 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const winRate = totalOps > 0 ? Math.round((wins / totalOps) * 100) : 0;
         const profitFactor = grossLoss === 0 ? (grossProfit > 0 ? 'MAX' : '0.00') : (grossProfit / grossLoss).toFixed(2);
-        
-        // Capital del usuario (O $1,000 por defecto si no lo configuró)
-        const baseCapital = parseFloat(user.initial_balance) > 0 ? parseFloat(user.initial_balance) : 1000;
-        const profitPercent = (totalPnl / baseCapital) * 100;
+        const profitPercent = (totalPnl / BASE_CAPITAL) * 100;
 
         return {
           id: user.id,
@@ -140,17 +152,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
       });
 
-      // ORDENAR: Primero el % mayor
       leaderboard.sort((a, b) => b.profitPercent - a.profitPercent);
 
-      // Renderizar la tabla
       tbody.innerHTML = '';
       leaderboard.forEach((trader, index) => {
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--card-border)';
         tr.style.height = '48px';
 
-        // Resaltar al usuario logueado
         if (currentUser && currentUser.id === trader.id) {
           tr.style.background = 'rgba(34, 197, 94, 0.05)';
         }
@@ -163,7 +172,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const pnlColor = trader.profitPercent >= 0 ? '#22c55e' : '#ef4444';
         const sign = trader.profitPercent > 0 ? '+' : '';
 
-        // Se agregó la columna de (+$0.00) en gris para claridad
         tr.innerHTML = `
           <td style="padding: 10px; font-weight: 700;">${posDisplay}</td>
           <td style="padding: 10px; font-weight: 600; color: var(--text-main);">${trader.username}</td>
@@ -177,7 +185,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
         tbody.appendChild(tr);
       });
-
     } catch (err) {
       console.error(err);
     }
@@ -186,9 +193,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkUserStatus();
   await loadLeaderboard();
 
-  // Logout para el Sidebar de Comunidad
-  const logoutBtns = document.querySelectorAll('.btn-logout');
-  logoutBtns.forEach(btn => {
+  // Logout Sidebar
+  document.querySelectorAll('.btn-logout').forEach(btn => {
     btn.addEventListener('click', () => {
       if (confirm('¿Deseas cerrar sesión?')) {
         localStorage.removeItem('life_trading_user');
