@@ -717,8 +717,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const dayPnl = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
 
       if (dayTrades.length > 0) {
-        const lastTrade = dayTrades[dayTrades.length - 1];
-        cell.className = `cell ${lastTrade.resultType}`;
+        const dayResult = dayPnl > 0 ? 'tp' : dayPnl < 0 ? 'sl' : 'be';
+        cell.className = `cell ${dayResult}`;
         const sign = dayPnl >= 0 ? '+' : '';
         cell.innerHTML = `
           <span class="cell-num">${dayStr}</span>
