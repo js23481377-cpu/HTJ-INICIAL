@@ -68,14 +68,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // CARGAR LEADERBOARD
+  // CARGAR LEADERBOARD CONECTADO A LOS TRADES
   async function loadLeaderboard() {
     const tbody = document.getElementById('leaderboardBody');
     if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Cargando ranking en vivo...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Sincronizando operaciones...</td></tr>`;
 
     try {
-      // 1. Obtener todos los perfiles aprobados
+      // 1. Obtener perfiles aprobados
       const { data: profiles, error: profErr } = await db
         .from('profiles')
         .select('*')
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      // 2. Obtener TODOS los trades sin restricciones de fecha por ahora para garantizar lectura
+      // 2. Obtener todos los trades de la base de datos
       const { data: trades, error: tradeErr } = await db
         .from('trades')
         .select('*');
@@ -104,11 +104,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const BASE_CAPITAL = 1000;
 
       const leaderboard = profiles.map(user => {
-        // Filtrar trades que correspondan al usuario por ID o por Email
+        // Cruzar trades por id de usuario o por email de forma flexible
         const userTrades = (trades || []).filter(t => {
-          const matchId = t.user_id && t.user_id === user.id;
+          const matchId = t.user_id && String(t.user_id) === String(user.id);
           const matchEmail = t.email && user.email && t.email.toLowerCase() === user.email.toLowerCase();
-          const res = (t.result || t.type || '').toUpperCase();
+          const res = (t.result || t.resultType || t.type || '').toUpperCase();
           return (matchId || matchEmail) && res !== 'NOOP';
         });
 
@@ -117,12 +117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         userTrades.forEach(t => {
           const pnl = parseFloat(t.pnl) || 0;
-          const res = (t.result || t.type || '').toUpperCase();
+          const res = (t.result || t.resultType || t.type || '').toUpperCase();
           totalPnl += pnl;
 
-          if (res === 'TP' || pnl > 0) {
+          if (res === 'TP' || res === 'WIN' || pnl > 0) {
             wins++; grossProfit += pnl;
-          } else if (res === 'SL' || pnl < 0) {
+          } else if (res === 'SL' || res === 'LOSS' || pnl < 0) {
             losses++; grossLoss += Math.abs(pnl);
           }
         });
@@ -162,13 +162,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const pnlColor = trader.profitPercent >= 0 ? '#22c55e' : '#ef4444';
         const sign = trader.profitPercent > 0 ? '+' : '';
 
+        // Sin rastro de dinero, solo el porcentaje limpio con su color
         tr.innerHTML = `
           <td style="padding: 10px; font-weight: 700;">${posDisplay}</td>
           <td style="padding: 10px; font-weight: 600; color: var(--text-main);">${trader.username}</td>
-          <td style="padding: 10px; font-weight: 800; color: ${pnlColor};">
-            ${sign}${trader.profitPercent.toFixed(2)}% 
-            <span style="font-size: 11px; font-weight: 500; color: var(--text-muted); margin-left: 4px;">(${sign}$${trader.totalPnl.toFixed(2)})</span>
-          </td>
+          <td style="padding: 10px; font-weight: 800; color: ${pnlColor};">${sign}${trader.profitPercent.toFixed(2)}%</td>
           <td style="padding: 10px;">${trader.winRate}%</td>
           <td style="padding: 10px;">${trader.totalOps}</td>
           <td style="padding: 10px; font-weight: 700; color: #22c55e;">${trader.profitFactor}</td>
