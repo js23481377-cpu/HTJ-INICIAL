@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // BOTÓN PARTICIPAR (INSERCIÓN FORZOSA SI NO EXISTE)
+  // BOTÓN PARTICIPAR
   if (btnJoinRanking) {
     btnJoinRanking.addEventListener('click', async () => {
       if (!currentUser) return alert('Debes iniciar sesión primero.');
@@ -46,22 +46,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (btnJoinText) btnJoinText.textContent = 'Activando...';
 
       try {
-        // 1. Intentar actualizar si el perfil existe
-        const { data: updated } = await db
-          .from('profiles')
-          .update({ is_approved: true })
-          .eq('id', currentUser.id)
-          .select();
-
-        // 2. Si no existe, insertarlo a la fuerza
-        if (!updated || updated.length === 0) {
-          await db.from('profiles').insert([{
-            id: currentUser.id,
-            email: currentUser.email,
-            username: currentUser.username || 'Trader',
-            is_approved: true
-          }]);
-        }
+        await db.from('profiles').upsert([{
+          id: currentUser.id,
+          email: currentUser.email,
+          username: currentUser.username || 'Trader',
+          is_approved: true
+        }], { onConflict: 'id' });
 
         setButtonActiveState();
         if (rankingStatusMsg) {
@@ -82,44 +72,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function loadLeaderboard() {
     const tbody = document.getElementById('leaderboardBody');
     if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Calculando ranking del mes en vivo...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Cargando ranking en vivo...</td></tr>`;
 
     try {
-      // Pedir solo datos seguros para evitar crashes
+      // 1. Obtener todos los perfiles aprobados
       const { data: profiles, error: profErr } = await db
         .from('profiles')
-        .select('id, username, email')
+        .select('*')
         .eq('is_approved', true);
 
       if (profErr) {
         console.error("Error perfiles:", profErr);
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: #ef4444;">Error de conexión. Revisa consola.</td></tr>`;
         return;
       }
 
-      // Trades del mes actual
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-
-      const { data: trades } = await db
+      // 2. Obtener TODOS los trades sin restricciones de fecha por ahora para garantizar lectura
+      const { data: trades, error: tradeErr } = await db
         .from('trades')
-        .select('*')
-        .gte('created_at', startOfMonth)
-        .lte('created_at', endOfMonth);
+        .select('*');
+
+      if (tradeErr) {
+        console.error("Error trades:", tradeErr);
+        return;
+      }
 
       if (!profiles || profiles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Aún no hay traders participando. ¡Únete al ranking!</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Aún no hay traders participando.</td></tr>`;
         return;
       }
 
-      const BASE_CAPITAL = 1000; // Base estándar para todos
+      const BASE_CAPITAL = 1000;
 
       const leaderboard = profiles.map(user => {
+        // Filtrar trades que correspondan al usuario por ID o por Email
         const userTrades = (trades || []).filter(t => {
-          const matchUser = (t.user_id === user.id || t.email === user.email);
+          const matchId = t.user_id && t.user_id === user.id;
+          const matchEmail = t.email && user.email && t.email.toLowerCase() === user.email.toLowerCase();
           const res = (t.result || t.type || '').toUpperCase();
-          return matchUser && res !== 'NOOP';
+          return (matchId || matchEmail) && res !== 'NOOP';
         });
 
         const totalOps = userTrades.length;
@@ -143,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         return {
           id: user.id,
-          username: user.username || 'Trader',
+          username: user.username || user.email.split('@')[0] || 'Trader',
           totalOps,
           winRate,
           totalPnl,
@@ -193,13 +183,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkUserStatus();
   await loadLeaderboard();
 
-  // Logout Sidebar
   document.querySelectorAll('.btn-logout').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (confirm('¿Deseas cerrar sesión?')) {
-        localStorage.removeItem('life_trading_user');
-        window.location.href = 'login.html';
-      }
+      localStorage.removeItem('life_trading_user');
+      window.location.href = 'login.html';
     });
   });
 });
