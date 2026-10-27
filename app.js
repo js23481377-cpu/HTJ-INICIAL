@@ -62,12 +62,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const requestCodeForm = document.getElementById('requestCodeForm') || document.querySelector('form');
   if (requestCodeForm) {
     requestCodeForm.addEventListener('submit', async (e) => {
-      // Solo interviene si el formulario actual tiene el campo de solicitar código
       const emailInput = requestCodeForm.querySelector('input[type="email"]');
       const usernameInput = requestCodeForm.querySelector('input[placeholder*="Apodo"]') || requestCodeForm.querySelector('input[type="text"]');
       const passwordInput = requestCodeForm.querySelector('input[type="password"]');
 
-      if (!emailInput || !passwordInput) return; // Es otro formulario, continuar normalmente
+      if (!emailInput || !passwordInput) return;
 
       e.preventDefault();
       const email = emailInput.value.trim();
@@ -75,10 +74,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const password = passwordInput.value;
 
       try {
-        // Generar código aleatorio de 6 dígitos
         const accessCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // 1. Registrar usuario en Supabase Auth enviando meta_data para el Trigger
         const { data, error } = await db.auth.signUp({
           email: email,
           password: password,
@@ -92,7 +89,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (error) throw error;
 
-        // 2. Enviar correo electrónico mediante EmailJS
         if (typeof emailjs !== 'undefined') {
           const templateParams = {
             to_email: email,
@@ -111,7 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // --- FUNCIONES DE SINCRONIZACIÓN CON SUPABASE ---
+  // --- FUNCIONES DE SINCRONIZACIÓN CON SUPABASE (CANDADO DE LECTURA) ---
   async function fetchTradesFromCloud() {
     if (!currentUser || !currentUser.id || typeof db === 'undefined') return;
 
@@ -128,17 +124,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (data && data.length > 0) {
-        trades = data.map(t => ({
-          id: t.id,
-          date: t.created_at ? t.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-          asset: t.asset,
-          direction: t.type || 'LONG',
-          strategy: t.notes && t.notes.includes('Estrategia:') ? t.notes.split('|')[0].replace('Estrategia:', '').trim() : '',
-          resultType: t.result ? t.result.toLowerCase() : 'tp',
-          pnl: parseFloat(t.pnl) || 0,
-          notes: t.notes || '',
-          photo: ''
-        }));
+        trades = data.map(t => {
+          const exactResult = (t.result || t.type || 'tp').toLowerCase();
+          let rawPnl = parseFloat(t.pnl) || 0;
+
+          // BLINDAJE DE LECTURA: Asegura que el signo refleje estrictamente el tipo guardado
+          if (exactResult === 'sl' && rawPnl > 0) rawPnl = -rawPnl;
+          if (exactResult === 'tp' && rawPnl < 0) rawPnl = Math.abs(rawPnl);
+
+          return {
+            id: t.id,
+            date: t.created_at ? t.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            asset: t.asset,
+            direction: t.type || 'LONG',
+            strategy: t.notes && t.notes.includes('Estrategia:') ? t.notes.split('|')[0].replace('Estrategia:', '').trim() : '',
+            resultType: exactResult,
+            pnl: rawPnl,
+            notes: t.notes || '',
+            photo: ''
+          };
+        });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
       }
     } catch (err) {
@@ -153,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const { data, error } = await db.from('trades').insert([
         {
           user_id: currentUser.id,
+          email: currentUser.email || null,
           asset: tradeData.asset,
           type: tradeData.direction,
           entry_price: 0,
@@ -357,7 +363,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     strategyGroup.innerHTML = '';
     if (tradeStrategyInput) tradeStrategyInput.value = selectedStrategy;
 
-    // 1. Burbuja "Sin estrategia"
     const noneBtn = document.createElement('button');
     noneBtn.type = 'button';
     noneBtn.className = `strategy-bubble ${selectedStrategy === '' ? 'active' : ''}`;
@@ -370,7 +375,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     strategyGroup.appendChild(noneBtn);
 
-    // 2. Burbujas creadas por el usuario (Límite 5)
     customStrategies.forEach(strat => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -397,7 +401,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       strategyGroup.appendChild(btn);
     });
 
-    // 3. Botón + Nueva (Máx 5)
     if (customStrategies.length < 5) {
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
@@ -549,20 +552,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       
       const rawPnl = parseFloat(document.getElementById('tradePnl').value) || 0;
-      const resultType = tradeResultTypeInput.value; // 'tp', 'sl', 'be', etc.
+      const resultType = tradeResultTypeInput.value.toLowerCase(); // 'tp', 'sl', etc.
       const strategyInput = document.getElementById('tradeStrategy');
       const strategyVal = strategyInput ? strategyInput.value : '';
 
-      // --- INICIO DEL CANDADO MATEMÁTICO ---
+      // --- CANDADO MATEMÁTICO BLINDADO ---
       let pnlValue = rawPnl;
       if (resultType === 'sl') {
-        pnlValue = -Math.abs(rawPnl); // Fuerza negativo
+        pnlValue = -Math.abs(rawPnl); // Fuerza siempre negativo para SL
       } else if (resultType === 'tp') {
-        pnlValue = Math.abs(rawPnl);  // Fuerza positivo
+        pnlValue = Math.abs(rawPnl);  // Fuerza siempre positivo para TP
       } else if (resultType === 'noop' || resultType === 'be') {
         pnlValue = 0;
       }
-      // --- FIN DEL CANDADO MATEMÁTICO ---
+      // -----------------------------------
 
       const editId = editingTradeIdInput.value;
 
@@ -644,7 +647,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderStrategyColumns();
   }
 
-  // --- DESGLOSE POR BURBUJAS DE ESTRATEGIA EN COLUMNAS ---
   function renderStrategyColumns() {
     const container = document.getElementById('strategyColumnsContainer');
     if (!container) return;
@@ -798,7 +800,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Cargar operaciones guardadas en la nube al inicio
   await fetchTradesFromCloud();
   updateDashboard();
 });
