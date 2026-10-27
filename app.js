@@ -7,18 +7,21 @@ const SUPABASE_URL = 'https://okihugbwtxbycvjiskyf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9raWh1Z2J3dHhieWN2amlza3lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNDMxODQsImV4cCI6MjEwODYxOTE4NH0.tUIXj2-LHngS4pEn36XSk9kVs2GvFDXKhlZDA0tgnR8';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 2. ESTADO GLOBAL
+// 2. ESTADO GLOBAL DE LA APLICACIÓN
 let currentUser = null;
-let currentViewDate = new Date(); 
+let currentViewDate = new Date(); // Mes y año en visualización
 let dailyChartInstance = null;
 let selectedDateForTrade = null;
 let userInitialBalance = 0;
 let currentMonthTrades = [];
 
-// 3. INICIALIZACIÓN
+// 3. INICIALIZACIÓN AL CARGAR EL DOM
 document.addEventListener('DOMContentLoaded', async () => {
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 
+  // Cargar usuario autenticado desde localStorage
   const localData = localStorage.getItem('life_trading_user');
   if (!localData) {
     window.location.href = 'login.html';
@@ -26,13 +29,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   currentUser = JSON.parse(localData);
 
+  // Actualizar textos y avatares del perfil
   updateUserProfileUI();
+
+  // Configurar listeners de la interfaz
   setupMonthNavigation();
   setupModalEvents();
   setupPillGroupEvents();
   setupFormListeners();
   setupLogout();
 
+  // Cargar datos iniciales del Dashboard
   await loadDashboardData();
 });
 
@@ -82,6 +89,7 @@ function setupMonthNavigation() {
       await loadDashboardData();
     });
   }
+
   if (nextBtn) {
     nextBtn.addEventListener('click', async () => {
       currentViewDate.setMonth(currentViewDate.getMonth() + 1);
@@ -91,7 +99,7 @@ function setupMonthNavigation() {
 }
 
 // =========================================================
-// CONSULTAS A BASE DE DATOS
+// CONSULTAS A BASE DE DATOS (SUPABASE)
 // =========================================================
 
 async function fetchUserBalance() {
@@ -106,6 +114,7 @@ async function fetchUserBalance() {
       userInitialBalance = parseFloat(profile.initial_balance) || 0;
     } else {
       userInitialBalance = 0;
+      // Mostrar modal de configuración de capital si no se ha definido
       const modal = document.getElementById('initialBalanceModal');
       if (modal) modal.style.display = 'flex';
     }
@@ -118,6 +127,7 @@ async function fetchUserTrades() {
   try {
     const year = currentViewDate.getFullYear();
     const month = currentViewDate.getMonth();
+
     const startOfMonth = new Date(year, month, 1).toISOString();
     const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
 
@@ -135,6 +145,8 @@ async function fetchUserTrades() {
     }
 
     currentMonthTrades = trades || [];
+
+    // Renderizar métricas y componentes del dashboard
     renderKPIsAndCapital();
     renderDailyChart();
     renderCalendar();
@@ -145,17 +157,22 @@ async function fetchUserTrades() {
 }
 
 // =========================================================
-// RENDERIZADO DEL DASHBOARD Y MÉTRICAS
+// CÁLCULO DE MÉTRICAS Y RENDERIZADO DEL DASHBOARD
 // =========================================================
 
 function renderKPIsAndCapital() {
   const activeTrades = currentMonthTrades.filter(t => t.result !== 'NOOP');
   
-  let monthPnl = 0, wins = 0, losses = 0, grossProfit = 0, grossLoss = 0;
+  let monthPnl = 0;
+  let wins = 0;
+  let losses = 0;
+  let grossProfit = 0;
+  let grossLoss = 0;
 
   activeTrades.forEach(t => {
     const pnl = parseFloat(t.pnl) || 0;
     const res = (t.result || t.type || '').toUpperCase();
+
     monthPnl += pnl;
 
     if (res === 'TP' || pnl > 0) {
@@ -180,21 +197,26 @@ function renderKPIsAndCapital() {
   const avgWin = wins > 0 ? (grossProfit / wins).toFixed(0) : '0';
   const avgLoss = losses > 0 ? (grossLoss / losses).toFixed(0) : '0';
 
+  // Capital Actual
   const currentCapital = userInitialBalance + monthPnl;
   const capitalAmountEl = document.getElementById('capitalAmount');
   const capitalBadgeEl = document.getElementById('capitalBadge');
 
-  if (capitalAmountEl) capitalAmountEl.textContent = `$${currentCapital.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (capitalAmountEl) {
+    capitalAmountEl.textContent = `$${currentCapital.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
 
   if (capitalBadgeEl) {
     const sign = monthPnl >= 0 ? '+' : '';
     const badgeColor = monthPnl >= 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)';
     const textColor = monthPnl >= 0 ? '#22c55e' : '#ef4444';
+    
     capitalBadgeEl.style.background = badgeColor;
     capitalBadgeEl.style.color = textColor;
     capitalBadgeEl.innerHTML = `${sign}$${monthPnl.toFixed(2)} <span>resultado del mes</span>`;
   }
 
+  // KPIs
   const kpiWinRate = document.getElementById('kpiWinRate');
   const kpiProfitFactor = document.getElementById('kpiProfitFactor');
   const kpiAvgWL = document.getElementById('kpiAvgWL');
@@ -205,25 +227,39 @@ function renderKPIsAndCapital() {
   if (kpiAvgWL) kpiAvgWL.textContent = `+$${avgWin} / -$${avgLoss}`;
   if (kpiStreak) kpiStreak.textContent = `${wins}W`;
 
+  // Resumen de la barra de la comunidad local
   const communityOps = document.getElementById('communityOps');
   const communityWinRate = document.getElementById('communityWinRate');
   if (communityOps) communityOps.textContent = totalOps;
   if (communityWinRate) communityWinRate.textContent = `${winRate}%`;
 }
 
+// =========================================================
+// GRÁFICO DE EVOLUCIÓN DIARIA (CHART.JS)
+// =========================================================
+
 function renderDailyChart() {
   const canvas = document.getElementById('dailyChart');
   if (!canvas) return;
+
   const ctx = canvas.getContext('2d');
-  if (dailyChartInstance) dailyChartInstance.destroy();
+  if (dailyChartInstance) {
+    dailyChartInstance.destroy();
+  }
 
   const daysInMonth = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth() + 1, 0).getDate();
   const labels = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
+  // Mapear PnL acumulado diario
   let cumulativePnl = 0;
   const dataPoints = labels.map(day => {
-    const dayTrades = currentMonthTrades.filter(t => new Date(t.created_at).getDate() === day);
-    cumulativePnl += dayTrades.reduce((acc, t) => acc + (parseFloat(t.pnl) || 0), 0);
+    const dayTrades = currentMonthTrades.filter(t => {
+      const d = new Date(t.created_at);
+      return d.getDate() === day;
+    });
+
+    const dayPnl = dayTrades.reduce((acc, t) => acc + (parseFloat(t.pnl) || 0), 0);
+    cumulativePnl += dayPnl;
     return cumulativePnl;
   });
 
@@ -244,7 +280,8 @@ function renderDailyChart() {
       }]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#a1a1aa', font: { size: 10 } } },
@@ -254,17 +291,24 @@ function renderDailyChart() {
   });
 }
 
+// =========================================================
+// CALENDARIO DE TRADING
+// =========================================================
+
 function renderCalendar() {
   const container = document.getElementById('calendar-cells');
   const registeredTag = document.getElementById('registeredTag');
   if (!container) return;
+
   container.innerHTML = '';
 
   const year = currentViewDate.getFullYear();
   const month = currentViewDate.getMonth();
+
   const firstDayIndex = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+  // Agrupar trades por día
   const tradesByDay = {};
   currentMonthTrades.forEach(t => {
     const dayNum = new Date(t.created_at).getDate();
@@ -272,17 +316,21 @@ function renderCalendar() {
     tradesByDay[dayNum].push(t);
   });
 
-  if (registeredTag) registeredTag.textContent = `${Object.keys(tradesByDay).length} días registrados`;
+  const registeredDaysCount = Object.keys(tradesByDay).length;
+  if (registeredTag) registeredTag.textContent = `${registeredDaysCount} días registrados`;
 
+  // Rellenar días vacíos antes del inicio del mes
   for (let i = 0; i < firstDayIndex; i++) {
     const emptyCell = document.createElement('div');
     emptyCell.className = 'calendar-cell empty';
     container.appendChild(emptyCell);
   }
 
+  // Crear celdas de días del mes
   for (let day = 1; day <= daysInMonth; day++) {
     const cell = document.createElement('div');
     cell.className = 'calendar-cell';
+
     const dayTrades = tradesByDay[day] || [];
     let statusDotHtml = '';
 
@@ -296,32 +344,43 @@ function renderCalendar() {
       if (hasRetirada) dotClass = 'retirada';
       else if (dayPnl > 0 || hasTP) dotClass = 'tp';
       else if (dayPnl < 0 || hasSL) dotClass = 'sl';
+
       statusDotHtml = `<span class="dot ${dotClass}"></span>`;
     }
 
-    cell.innerHTML = `<span class="day-number">${day}</span>${statusDotHtml}`;
+    cell.innerHTML = `
+      <span class="day-number">${day}</span>
+      ${statusDotHtml}
+    `;
+
+    // Click en la celda del día abre el modal de operaciones
     cell.addEventListener('click', () => {
       const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       openDayTradesModal(formattedDate, dayTrades);
     });
+
     container.appendChild(cell);
   }
 }
 
 // =========================================================
-// MODALES DE OPERACIÓN
+// DENGAN Y MANEJO DE MODALES DE OPERACIÓN
 // =========================================================
 
 function openDayTradesModal(dateStr, tradesForDay = []) {
   selectedDateForTrade = dateStr;
+  
   const modal = document.getElementById('tradeModal');
   const modalTitle = document.getElementById('modalTitle');
-  
+  const dayTradesView = document.getElementById('dayTradesView');
+  const tradeForm = document.getElementById('tradeForm');
+
   if (modalTitle) modalTitle.textContent = `Operaciones del ${dateStr}`;
-  document.getElementById('dayTradesView').style.display = 'block';
-  document.getElementById('tradeForm').style.display = 'none';
+  if (dayTradesView) dayTradesView.style.display = 'block';
+  if (tradeForm) tradeForm.style.display = 'none';
 
   renderTradesList(tradesForDay);
+
   if (modal) modal.style.display = 'flex';
 }
 
@@ -330,17 +389,18 @@ function renderTradesList(tradesForDay) {
   if (!container) return;
 
   if (!tradesForDay || tradesForDay.length === 0) {
-    container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 15px;">No hay operaciones registradas.</p>';
+    container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 15px;">No hay operaciones en esta fecha.</p>';
     return;
   }
 
   container.innerHTML = tradesForDay.map(trade => {
-    // Lectura estricta del resultado guardado
+    // Tomar el resultado estricto
     const resType = (trade.result || trade.type || 'TP').toUpperCase();
     const pnlVal = parseFloat(trade.pnl) || 0;
-    const isPositive = resType === 'TP' || (resType !== 'SL' && pnlVal > 0);
-    const pnlSign = isPositive ? '+' : (resType === 'SL' || pnlVal < 0 ? '-' : '');
-    const pnlClass = isPositive ? 'text-green' : (resType === 'SL' || pnlVal < 0 ? 'text-red' : '');
+    
+    const isPositive = pnlVal > 0 || resType === 'TP';
+    const pnlSign = pnlVal >= 0 ? '+' : '';
+    const pnlClass = isPositive ? 'text-green' : (pnlVal < 0 || resType === 'SL' ? 'text-red' : '');
 
     return `
       <div class="trade-item-card" style="padding: 12px; border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02);">
@@ -348,7 +408,7 @@ function renderTradesList(tradesForDay) {
           <div>
             <strong style="font-size: 14px;">${trade.asset || 'NAS100'} (${trade.direction || 'LONG'}) - <span class="${pnlClass}">${pnlSign}$${Math.abs(pnlVal).toFixed(2)}</span></strong>
             <div style="font-size: 11px; color: #22c55e; margin-top: 2px;">Estrategia: ${trade.strategy || 'Sin estrategia'}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Tipo: ${resType}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Tipo: ${resType} | Estrategia: ${trade.strategy || 'Sin estrategia'}</div>
           </div>
           <div style="display: flex; gap: 8px;">
             <button onclick="window.editTrade('${trade.id}')" class="btn-icon-setting" title="Editar"><i data-lucide="edit-2"></i></button>
@@ -358,21 +418,27 @@ function renderTradesList(tradesForDay) {
       </div>
     `;
   }).join('');
+
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+// FUNCIONES GLOBALES PARA EVENTOS INLINE
 window.editTrade = function (tradeId) {
   const trade = currentMonthTrades.find(t => t.id === tradeId);
   if (!trade) return;
 
-  document.getElementById('dayTradesView').style.display = 'none';
-  document.getElementById('tradeForm').style.display = 'flex';
+  const dayTradesView = document.getElementById('dayTradesView');
+  const tradeForm = document.getElementById('tradeForm');
+
+  if (dayTradesView) dayTradesView.style.display = 'none';
+  if (tradeForm) tradeForm.style.display = 'flex';
 
   document.getElementById('editingTradeId').value = trade.id;
   document.getElementById('tradeDate').value = trade.created_at ? trade.created_at.split('T')[0] : selectedDateForTrade;
   document.getElementById('tradePnl').value = Math.abs(trade.pnl || 0);
   document.getElementById('tradeNotes').value = trade.notes || '';
 
+  // Activar botones POLD según los valores
   setGroupActiveValue('typeGroup', (trade.result || trade.type || 'TP').toLowerCase(), 'tradeResultType');
   setGroupActiveValue('assetGroup', trade.asset || 'NAS100', 'tradeAsset');
   setGroupActiveValue('directionGroup', trade.direction || 'LONG', 'tradeDirection');
@@ -380,9 +446,12 @@ window.editTrade = function (tradeId) {
 };
 
 window.deleteTrade = async function (tradeId) {
-  if (!confirm('¿Seguro que deseas eliminar esta operación?')) return;
+  if (!confirm('¿Estás seguro de eliminar esta operación?')) return;
+
   try {
     await db.from('trades').delete().eq('id', tradeId);
+    
+    // Ocultar modal y refrescar la vista
     document.getElementById('tradeModal').style.display = 'none';
     await loadDashboardData();
   } catch (err) {
@@ -408,18 +477,22 @@ function setGroupActiveValue(groupId, val, hiddenInputId) {
 }
 
 // =========================================================
-// MANEJO DE EVENTOS DEL FORMULARIO Y MODALES
+// CONFIGURACIÓN DE EVENTOS Y FORMULARIO DE TRADE
 // =========================================================
 
 function setupPillGroupEvents() {
-  ['typeGroup', 'assetGroup', 'directionGroup', 'strategyGroup'].forEach(groupId => {
+  const groups = ['typeGroup', 'assetGroup', 'directionGroup', 'strategyGroup'];
+
+  groups.forEach(groupId => {
     const group = document.getElementById(groupId);
     if (!group) return;
 
     group.addEventListener('click', (e) => {
       const btn = e.target.closest('.pill-btn');
       if (!btn) return;
-      group.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+
+      const buttons = group.querySelectorAll('.pill-btn');
+      buttons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
 
       const value = btn.getAttribute('data-value');
@@ -432,6 +505,7 @@ function setupPillGroupEvents() {
 }
 
 function setupFormListeners() {
+  // Formulario de Trade
   const tradeForm = document.getElementById('tradeForm');
   if (tradeForm) {
     tradeForm.addEventListener('submit', async (e) => {
@@ -445,8 +519,9 @@ function setupFormListeners() {
       const strategy = document.getElementById('tradeStrategy').value || 'Sin estrategia';
       const notes = document.getElementById('tradeNotes').value.trim();
 
-      // CANDADO DE PNL: Asigna el signo según el tipo de resultado seleccionado
       let rawPnl = parseFloat(document.getElementById('tradePnl').value) || 0;
+
+      // FORZAR SIGNO CORRECTO
       let finalPnl = rawPnl;
       if (resultType === 'SL') {
         finalPnl = -Math.abs(rawPnl);
@@ -480,63 +555,99 @@ function setupFormListeners() {
     });
   }
 
+  // Formulario Capital Inicial
   const initialBalanceForm = document.getElementById('initialBalanceForm');
   if (initialBalanceForm) {
     initialBalanceForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const val = parseFloat(document.getElementById('initialBalanceInput').value) || 0;
+
       await db.from('profiles').update({ initial_balance: val }).eq('id', currentUser.id);
+
       userInitialBalance = val;
       document.getElementById('initialBalanceModal').style.display = 'none';
       await loadDashboardData();
     });
   }
+}
 
-  // Edición del Plan de Trading
-  const editPlanBtn = document.getElementById('editPlanBtn');
-  const planModal = document.getElementById('planModal');
-  const closePlanModalBtn = document.getElementById('closePlanModalBtn');
-  const cancelPlanModalBtn = document.getElementById('cancelPlanModalBtn');
-  const planForm = document.getElementById('planForm');
+// =========================================================
+// PLAN DE TRADING Y RENDIMIENTO POR ESTRATEGIA
+// =========================================================
 
-  if (editPlanBtn && planModal) {
-    editPlanBtn.addEventListener('click', async () => {
-      const { data: profile } = await db.from('profiles').select('trading_plan').eq('id', currentUser.id).maybeSingle();
-      const plan = (profile && profile.trading_plan) ? profile.trading_plan : [
-        "Arriesgar máximo el 1% por operación",
-        "Respetar el Horario Operativo (09:30 AM - 11:30 AM)",
-        "Detener la sesión tras 2 Stop Loss seguidos"
-      ];
-      if (document.getElementById('planRule1')) document.getElementById('planRule1').value = plan[0] || '';
-      if (document.getElementById('planRule2')) document.getElementById('planRule2').value = plan[1] || '';
-      if (document.getElementById('planRule3')) document.getElementById('planRule3').value = plan[2] || '';
-      planModal.style.display = 'flex';
-    });
-  }
+async function fetchTradingPlan() {
+  const container = document.getElementById('planListContainer');
+  if (!container) return;
 
-  if (closePlanModalBtn && planModal) {
-    closePlanModalBtn.addEventListener('click', () => planModal.style.display = 'none');
-  }
-  if (cancelPlanModalBtn && planModal) {
-    cancelPlanModalBtn.addEventListener('click', () => planModal.style.display = 'none');
-  }
+  try {
+    const { data: profile } = await db
+      .from('profiles')
+      .select('trading_plan')
+      .eq('id', currentUser.id)
+      .maybeSingle();
 
-  if (planForm) {
-    planForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const r1 = document.getElementById('planRule1').value.trim();
-      const r2 = document.getElementById('planRule2').value.trim();
-      const r3 = document.getElementById('planRule3').value.trim();
-      const newPlan = [r1, r2, r3].filter(r => r.length > 0);
+    const plan = (profile && profile.trading_plan) ? profile.trading_plan : [
+      "Arriesgar máximo el 1% por operación",
+      "Respetar el Horario Operativo (09:30 AM - 11:30 AM)",
+      "Detener la sesión tras 2 Stop Loss seguidos"
+    ];
 
-      await db.from('profiles').update({ trading_plan: newPlan }).eq('id', currentUser.id);
-      if (planModal) planModal.style.display = 'none';
-      await fetchTradingPlan();
-    });
+    container.innerHTML = plan.map((rule, idx) => `
+      <li><strong>0${idx + 1}.</strong> ${rule}</li>
+    `).join('');
+
+  } catch (err) {
+    console.error('Error al cargar plan de trading:', err);
   }
 }
 
+function renderStrategyBreakdown() {
+  const container = document.getElementById('strategyColumnsContainer');
+  if (!container) return;
+
+  const strategiesMap = {};
+
+  currentMonthTrades.forEach(t => {
+    if (t.result === 'NOOP') return;
+    const strat = t.strategy || 'Sin estrategia';
+    if (!strategiesMap[strat]) {
+      strategiesMap[strat] = { total: 0, wins: 0, pnl: 0 };
+    }
+
+    strategiesMap[strat].total++;
+    const pnl = parseFloat(t.pnl) || 0;
+    strategiesMap[strat].pnl += pnl;
+    if (t.result === 'TP' || pnl > 0) strategiesMap[strat].wins++;
+  });
+
+  const keys = Object.keys(strategiesMap);
+  if (keys.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-muted); font-size: 12px; grid-column: 1 / -1;">No hay métricas de estrategia para este mes.</p>';
+    return;
+  }
+
+  container.innerHTML = keys.slice(0, 5).map(strat => {
+    const data = strategiesMap[strat];
+    const winRate = data.total > 0 ? Math.round((data.wins / data.total) * 100) : 0;
+    const sign = data.pnl >= 0 ? '+' : '';
+    const pnlClass = data.pnl >= 0 ? 'text-green' : 'text-red';
+
+    return `
+      <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--text-main); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${strat}</span>
+        <div style="font-size: 16px; font-weight: 800; margin-top: 4px;" class="${pnlClass}">${sign}$${data.pnl.toFixed(2)}</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">WR: ${winRate}% (${data.total} ops)</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// =========================================================
+// EVENTOS DE MODALES Y LOGOUT
+// =========================================================
+
 function setupModalEvents() {
+  // Modal de Trade
   const openModalBtn = document.getElementById('openModalBtn');
   const closeModalBtn = document.getElementById('closeModalBtn');
   const addNewTradeBtn = document.getElementById('addNewTradeBtn');
@@ -550,11 +661,13 @@ function setupModalEvents() {
       openDayTradesModal(today, todayTrades);
     });
   }
+
   if (closeModalBtn) {
     closeModalBtn.addEventListener('click', () => {
       if (tradeModal) tradeModal.style.display = 'none';
     });
   }
+
   if (addNewTradeBtn) {
     addNewTradeBtn.addEventListener('click', () => {
       document.getElementById('dayTradesView').style.display = 'none';
@@ -565,6 +678,7 @@ function setupModalEvents() {
       document.getElementById('tradeNotes').value = '';
     });
   }
+
   if (backToListBtn) {
     backToListBtn.addEventListener('click', () => {
       document.getElementById('tradeForm').style.display = 'none';
@@ -572,6 +686,7 @@ function setupModalEvents() {
     });
   }
 
+  // Editar Capital
   const editBalanceBtn = document.getElementById('editBalanceBtn');
   if (editBalanceBtn) {
     editBalanceBtn.addEventListener('click', () => {
@@ -593,60 +708,4 @@ function setupLogout() {
       }
     });
   }
-}
-
-// =========================================================
-// PLAN Y ESTRATEGIA
-// =========================================================
-
-async function fetchTradingPlan() {
-  const container = document.getElementById('planListContainer');
-  if (!container) return;
-  try {
-    const { data: profile } = await db.from('profiles').select('trading_plan').eq('id', currentUser.id).maybeSingle();
-    const plan = (profile && profile.trading_plan) ? profile.trading_plan : [
-      "Arriesgar máximo el 1% por operación",
-      "Respetar el Horario Operativo (09:30 AM - 11:30 AM)",
-      "Detener la sesión tras 2 Stop Loss seguidos"
-    ];
-    container.innerHTML = plan.map((rule, idx) => `<li><strong>0${idx + 1}.</strong> ${rule}</li>`).join('');
-  } catch (err) {
-    console.error('Error al cargar plan:', err);
-  }
-}
-
-function renderStrategyBreakdown() {
-  const container = document.getElementById('strategyColumnsContainer');
-  if (!container) return;
-
-  const strategiesMap = {};
-  currentMonthTrades.forEach(t => {
-    if (t.result === 'NOOP') return;
-    const strat = t.strategy || 'Sin estrategia';
-    if (!strategiesMap[strat]) strategiesMap[strat] = { total: 0, wins: 0, pnl: 0 };
-    strategiesMap[strat].total++;
-    const pnl = parseFloat(t.pnl) || 0;
-    strategiesMap[strat].pnl += pnl;
-    if (t.result === 'TP' || pnl > 0) strategiesMap[strat].wins++;
-  });
-
-  const keys = Object.keys(strategiesMap);
-  if (keys.length === 0) {
-    container.innerHTML = '<p style="color: var(--text-muted); font-size: 12px; grid-column: 1 / -1;">No hay métricas de estrategia para este mes.</p>';
-    return;
-  }
-
-  container.innerHTML = keys.slice(0, 5).map(strat => {
-    const data = strategiesMap[strat];
-    const winRate = data.total > 0 ? Math.round((data.wins / data.total) * 100) : 0;
-    const sign = data.pnl >= 0 ? '+' : '';
-    const pnlClass = data.pnl >= 0 ? 'text-green' : 'text-red';
-    return `
-      <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px;">
-        <span style="font-size: 12px; font-weight: 700; color: var(--text-main); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${strat}</span>
-        <div style="font-size: 16px; font-weight: 800; margin-top: 4px;" class="${pnlClass}">${sign}$${data.pnl.toFixed(2)}</div>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">WR: ${winRate}% (${data.total} ops)</div>
-      </div>
-    `;
-  }).join('');
 }
